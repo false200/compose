@@ -36,6 +36,7 @@ import (
 	"github.com/opencontainers/image-spec/specs-go"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/docker/compose/v5/internal/oci"
 	"github.com/docker/compose/v5/pkg/api"
@@ -476,7 +477,7 @@ func composeFileAsByteReader(ctx context.Context, filePath string, project *type
 	if err != nil {
 		return nil, fmt.Errorf("failed to open compose file %s: %w", filePath, err)
 	}
-	base, err := loader.LoadWithContext(ctx, types.ConfigDetails{
+	model, err := loader.LoadModelWithContext(ctx, types.ConfigDetails{
 		WorkingDir:  project.WorkingDir,
 		Environment: project.Environment,
 		ConfigFiles: []types.ConfigFile{
@@ -497,7 +498,7 @@ func composeFileAsByteReader(ctx context.Context, filePath string, project *type
 		return nil, err
 	}
 
-	in, err := base.MarshalYAML()
+	in, err := yaml.Marshal(model)
 	if err != nil {
 		return nil, err
 	}
