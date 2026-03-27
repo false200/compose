@@ -438,6 +438,39 @@ func (s *composeService) checkForSensitiveData(ctx context.Context, project *typ
 		allFindings = append(allFindings, findings...)
 	}
 	for _, service := range project.Services {
+		if len(service.Environment) == 0 {
+			continue
+		}
+
+		environment := map[string]string{}
+		for key, value := range service.Environment {
+			if value == nil {
+				continue
+			}
+			environment[key] = *value
+		}
+		if len(environment) == 0 {
+			continue
+		}
+
+		in, err := yaml.Marshal(map[string]any{
+			"services": map[string]any{
+				service.Name: map[string]any{
+					"environment": environment,
+				},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		findings, err := scan.ScanReader(bytes.NewReader(in))
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan environment for service %s: %w", service.Name, err)
+		}
+		allFindings = append(allFindings, findings...)
+	}
+	for _, service := range project.Services {
 		// Check env files
 		for _, envFile := range service.EnvFiles {
 			findings, err := scan.ScanFile(envFile.Path)
@@ -478,7 +511,7 @@ func composeFileAsByteReader(ctx context.Context, filePath string, project *type
 	if err != nil {
 		return nil, fmt.Errorf("failed to open compose file %s: %w", filePath, err)
 	}
-	configDetails := types.ConfigDetails{
+	model, err := loader.LoadModelWithContext(ctx, types.ConfigDetails{
 		WorkingDir:  project.WorkingDir,
 		Environment: project.Environment,
 		ConfigFiles: []types.ConfigFile{
@@ -487,26 +520,14 @@ func composeFileAsByteReader(ctx context.Context, filePath string, project *type
 				Content:  composeFile,
 			},
 		},
-	}
-	loadOptions := func(options *loader.Options) {
+	}, func(options *loader.Options) {
 		options.SkipValidation = true
 		options.SkipExtends = true
 		options.SkipConsistencyCheck = true
 		options.ResolvePaths = true
 		options.SkipInterpolation = true
 		options.SkipResolveEnvironment = true
-	}
-
-	base, err := loader.LoadWithContext(ctx, configDetails, loadOptions)
-	if err == nil {
-		in, err := base.MarshalYAML()
-		if err != nil {
-			return nil, err
-		}
-		return bytes.NewBuffer(in), nil
-	}
-
-	model, err := loader.LoadModelWithContext(ctx, configDetails, loadOptions)
+	})
 	if err != nil {
 		return nil, err
 	}
