@@ -184,12 +184,12 @@ func (s *composeService) createLayers(ctx context.Context, project *types.Projec
 	}
 
 	if options.ResolveImageDigests {
-		yaml, err := s.generateImageDigestsOverride(ctx, project)
+		overrideYAML, err := s.generateImageDigestsOverride(ctx, project)
 		if err != nil {
 			return nil, err
 		}
 
-		layerDescriptor := oci.DescriptorForComposeFile("image-digests.yaml", yaml)
+		layerDescriptor := oci.DescriptorForComposeFile("image-digests.yaml", overrideYAML)
 		layers = append(layers, layerDescriptor)
 	}
 	return layers, nil
