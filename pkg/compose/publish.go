@@ -477,7 +477,7 @@ func composeFileAsByteReader(ctx context.Context, filePath string, project *type
 	if err != nil {
 		return nil, fmt.Errorf("failed to open compose file %s: %w", filePath, err)
 	}
-	model, err := loader.LoadModelWithContext(ctx, types.ConfigDetails{
+	configDetails := types.ConfigDetails{
 		WorkingDir:  project.WorkingDir,
 		Environment: project.Environment,
 		ConfigFiles: []types.ConfigFile{
@@ -486,18 +486,29 @@ func composeFileAsByteReader(ctx context.Context, filePath string, project *type
 				Content:  composeFile,
 			},
 		},
-	}, func(options *loader.Options) {
+	}
+	loadOptions := func(options *loader.Options) {
 		options.SkipValidation = true
 		options.SkipExtends = true
 		options.SkipConsistencyCheck = true
 		options.ResolvePaths = true
 		options.SkipInterpolation = true
 		options.SkipResolveEnvironment = true
-	})
+	}
+
+	base, err := loader.LoadWithContext(ctx, configDetails, loadOptions)
+	if err == nil {
+		in, err := base.MarshalYAML()
+		if err != nil {
+			return nil, err
+		}
+		return bytes.NewBuffer(in), nil
+	}
+
+	model, err := loader.LoadModelWithContext(ctx, configDetails, loadOptions)
 	if err != nil {
 		return nil, err
 	}
-
 	in, err := yaml.Marshal(model)
 	if err != nil {
 		return nil, err
